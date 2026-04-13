@@ -7,6 +7,7 @@ const App = () => {
   const [status, setStatus] = useState('Ready');
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
+  const lastProcessedIndexRef = useRef(0);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -39,15 +40,19 @@ const App = () => {
     };
 
     recognition.onresult = (event) => {
-      let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
+      let newFinalText = '';
+      for (let i = lastProcessedIndexRef.current; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
+          newFinalText += event.results[i][0].transcript;
+          lastProcessedIndexRef.current = i + 1;
         }
       }
 
-      if (finalTranscript) {
-        setTranscript((prev) => (prev ? prev + ' ' : '') + finalTranscript);
+      if (newFinalText) {
+        setTranscript((prev) => {
+          const current = prev.trim();
+          return (current ? current + ' ' : '') + newFinalText.trim();
+        });
       }
     };
 
@@ -59,6 +64,7 @@ const App = () => {
       recognitionRef.current?.stop();
     } else {
       setError(null);
+      lastProcessedIndexRef.current = 0;
       recognitionRef.current?.start();
     }
   };
