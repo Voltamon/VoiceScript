@@ -25,6 +25,7 @@ const App = () => {
     recognition.onstart = () => {
       setIsRecording(true);
       setStatus('Listening...');
+      lastProcessedIndexRef.current = 0;
     };
 
     recognition.onend = () => {
@@ -50,13 +51,43 @@ const App = () => {
 
       if (newFinalText) {
         setTranscript((prev) => {
+          const currentWords = prev.trim().split(/\s+/).filter(Boolean);
+          const newWords = newFinalText.trim().split(/\s+/).filter(Boolean);
+          
+          const filteredNewWords = [];
+          for (const word of newWords) {
+            // Get the last 2 words of the existing transcript plus what we've added so far in this batch
+            const context = [...currentWords, ...filteredNewWords].slice(-2);
+            
+            // Normalize for comparison: lowercase and remove non-alphanumeric chars
+            const normalizedWord = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const isDuplicate = context.some(w => 
+              w.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedWord
+            );
+            
+            if (!isDuplicate) {
+              filteredNewWords.push(word);
+            }
+          }
+
+          if (filteredNewWords.length === 0) return prev;
+          
+          const resultText = filteredNewWords.join(' ');
           const current = prev.trim();
-          return (current ? current + ' ' : '') + newFinalText.trim();
+          return (current ? current + ' ' : '') + resultText;
         });
       }
     };
 
     recognitionRef.current = recognition;
+
+    return () => {
+      recognition.stop();
+      recognition.onstart = null;
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.onresult = null;
+    };
   }, []);
 
   const toggleRecording = () => {
@@ -64,7 +95,6 @@ const App = () => {
       recognitionRef.current?.stop();
     } else {
       setError(null);
-      lastProcessedIndexRef.current = 0;
       recognitionRef.current?.start();
     }
   };
